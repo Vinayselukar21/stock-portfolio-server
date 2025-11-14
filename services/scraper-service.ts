@@ -23,12 +23,23 @@ export async function MergeScrapedData() {
     }
 
     // 3. Read the latest Google Finance scraped results from local cache. (P/E Ratio and Latest earnings)
-    const filePath = resolve(process.cwd(), "services/localcache/google-peratio-earnings-cache.json");
-    const fileContents = readFileSync(filePath, "utf8");
-    const google_results = JSON.parse(fileContents);
+    let google_results: GoogleFinanceResult[] = [];
+    try {
+        const filePath = resolve(process.cwd(), "services/localcache/google-peratio-earnings-cache.json");
+        const fileContents = readFileSync(filePath, "utf8");
+        google_results = JSON.parse(fileContents);
+    } catch (error) {
+        console.error(`[MergeScrapedData] Failed to read Google cache:`, error instanceof Error ? error.message : error);
+        // Continue with empty array - will still create stock entries with portfolio data
+    }
 
-    // 4. For each Yahoo result, enrich it with Google data and portfolio info, and save to per-stock cache.
-    const finalResult = yahoo_results?.map((stock: YahooScrapeResponse) => {
+    // 4. Determine which stocks to process: use Yahoo results if available, otherwise fall back to portfolio stocks
+    const stocksToProcess = yahoo_results.length > 0 
+        ? yahoo_results.map(stock => ({ yahooData: stock, id: stock.id }))
+        : portfolioStocks.map(stock => ({ yahooData: null, id: stock.id }));
+
+    // 5. For each stock, enrich with Google data and portfolio info, and save to per-stock cache.
+    const finalResult = stocksToProcess.map(({ yahooData, id }) => {
         // Calculate expiry time 20 seconds from now in IST (expTime) for this cache entry.
         const after20Sec = new Date(new Date().getTime() + 20 * 1000);
         const expTime = after20Sec.toLocaleTimeString("en-IN", {
@@ -36,26 +47,33 @@ export async function MergeScrapedData() {
         });
 
         // Find corresponding result in Google scrape cache.
-        const googleDataForStock = google_results?.find((s: GoogleFinanceResult) => s?.id === stock.id);
+        const googleDataForStock = google_results?.find((s: GoogleFinanceResult) => s?.id === id);
 
         // Find additional investment information for this stock.
-        const investmentInfo = portfolioStocks?.find((s) => s?.id === stock.id);
+        const investmentInfo = portfolioStocks?.find((s) => s?.id === id);
 
         // Path to individual stock cache file.
-        const outputPath = resolve(__dirname, "localcache", "stocks", `${stock.id}.json`);
+        const outputPath = resolve(__dirname, "localcache", "stocks", `${id}.json`);
 
         // Combine all relevant data into a single stock data object.
+        // If Yahoo data is unavailable, use defaults and portfolio info
         const stockData = {
-            ...stock,
-            google_symbol: googleDataForStock?.google_symbol,
-            peRatio: googleDataForStock?.peRatio,
-            earningsPerShare: googleDataForStock?.earningsPerShare,
+            id: yahooData?.id ?? id,
+            exchange: yahooData?.exchange ?? "",
+            yahoo_symbol: yahooData?.yahoo_symbol ?? investmentInfo?.symbol.yahoo ?? "",
+            name: yahooData?.name ?? investmentInfo?.name ?? "",
+            shortName: yahooData?.shortName ?? investmentInfo?.name ?? "",
+            price: yahooData?.price ?? 0,
+            currency: yahooData?.currency ?? "",
+            google_symbol: googleDataForStock?.google_symbol ?? investmentInfo?.symbol.google ?? "",
+            peRatio: googleDataForStock?.peRatio ?? null,
+            earningsPerShare: googleDataForStock?.earningsPerShare ?? null,
             expTime,
-            purchasePrice: investmentInfo?.purchasePrice,
-            quantity: investmentInfo?.quantity,
-            investment: investmentInfo?.investment,
-            portfolioPercentage: investmentInfo?.portfolioPercentage,
-            sector: investmentInfo?.sector
+            purchasePrice: investmentInfo?.purchasePrice ?? 0,
+            quantity: investmentInfo?.quantity ?? 0,
+            investment: investmentInfo?.investment ?? 0,
+            portfolioPercentage: investmentInfo?.portfolioPercentage ?? "",
+            sector: investmentInfo?.sector ?? ""
         };
 
         // Ensure local cache directory exists.
@@ -68,6 +86,6 @@ export async function MergeScrapedData() {
         return stockData;
     });
 
-    // 5. Return the number of stocks processed (length of result array).
-    return finalResult?.length;
+    // 6. Return the number of stocks processed (length of result array).
+    return finalResult?.length ?? 0;
 }
