@@ -6,6 +6,7 @@ import GetStockStream from "../controllers/stock.stream.controller";
 export const router = Router()
 // Health check route to verify server is running
 router.get("/health", (req, res) => {
+    console.log("is alive.")
     res.send("Express server is running!");
 });
 
