@@ -110,6 +110,49 @@ Create a `.env` file in the project root (loaded via `dotenv`) to override defau
 
 ---
 
+## Docker Deployment
+
+1. **Build the Docker image**
+   ```bash
+   docker build -t stock-scraper .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -d -p 8080:8080 \
+     --name stock-scraper \
+     -e PORT=8080 \
+     -e ENVIRONMENT=production \
+     -e YAHOO_SCRAPE_INTERVAL=20 \
+     -e GOOGLE_SCRAPE_INTERVAL=200 \
+     -v $(pwd)/services/localcache:/app/services/localcache \
+     stock-scraper
+   ```
+
+   **Environment Variables:**
+   - `PORT`: Server port (default: 8080)
+   - `ENVIRONMENT`: Set to `production` or `development` (affects CORS settings)
+   - `YAHOO_SCRAPE_INTERVAL`: Scraping interval in seconds (default: 20000)
+   - `GOOGLE_SCRAPE_INTERVAL`: Scraping interval in seconds (default: 20000)
+   - `YAHOO_HEADER_VARIANTS`: (optional) JSON array for custom headers
+   - `YAHOO_PROXY_LIST`: (optional) Comma-separated proxy URLs
+   - `ALLOWED_ORIGINS`: (optional) Comma-separated CORS origins for production
+
+3. **Check container logs**
+   ```bash
+   docker logs -f stock-scraper
+   ```
+
+4. **Stop/Remove container**
+   ```bash
+   docker stop stock-scraper
+   docker rm stock-scraper
+   ```
+
+**Note:** The volume mount (`-v`) persists cache data between container restarts. Remove the `-v` flag if you don't need persistence.
+
+---
+
 ## Extending the Portfolio
 
 1. Add a new stock entry to `portfolio/stocks.ts` with a unique `id`, Google/Yahoo tickers, and investment metadata.

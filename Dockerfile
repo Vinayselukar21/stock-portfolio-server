@@ -19,8 +19,13 @@ RUN mkdir -p services/localcache/stocks
 # Expose the port the app runs on (default is 8080)
 EXPOSE 8080
 
-# Set environment to production
+# Set default environment variables
+# These can be overridden when running the container with -e flags
 ENV NODE_ENV=production
+ENV PORT=8080
+ENV ENVIRONMENT=production
+ENV YAHOO_SCRAPE_INTERVAL=20
+ENV GOOGLE_SCRAPE_INTERVAL=200
 
 # Run the app using Bun
 CMD ["bun", "run", "index.ts"]
