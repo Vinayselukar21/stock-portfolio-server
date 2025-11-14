@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+
+# Build outputs
+out
+dist
+*.tgz
+
+# Code coverage
+coverage
+*.lcov
+
+# Logs
+logs
+_.log
+report.*.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local cache (will be created at runtime or via volume)
+services/localcache/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
+.github
+
+# Documentation
+README.md
+*.md
+
+# Test files
+*.test.ts
+*.spec.ts
+
