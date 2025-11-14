@@ -4,16 +4,12 @@ import { portfolioStocks } from "../portfolio/stocks";
 import { ScrapeYahooFinance } from "../scrapers/yahoo-finance";
 import type { GoogleFinanceResult } from "../types/google-finance-type";
 import type { YahooScrapeResponse } from "../types/yahoo-finance-type";
+import { yahoo_symbols } from "../utils/portfolio-symbol-list";
 
 
 export async function MergeScrapedData() {
-    // 1. Prepare Yahoo symbols structure for scrapers
-    const yahoo_symbols = portfolioStocks?.flatMap((stock) => ({
-        symbol: stock.symbol.yahoo,
-        id: stock.id,
-    }));
 
-    // 2. Scrape latest data from Yahoo Finance for each symbol.
+    // 1. Scrape latest data from Yahoo Finance for each symbol.
     let yahoo_results: YahooScrapeResponse[] = [];
     try {
         yahoo_results = await ScrapeYahooFinance(yahoo_symbols);
@@ -22,7 +18,7 @@ export async function MergeScrapedData() {
         // Continue with empty array - Google data will still be merged
     }
 
-    // 3. Read the latest Google Finance scraped results from local cache. (P/E Ratio and Latest earnings)
+    // 2. Read the latest Google Finance scraped results from local cache. (P/E Ratio and Latest earnings)
     let google_results: GoogleFinanceResult[] = [];
     try {
         const filePath = resolve(process.cwd(), "services/localcache/google-peratio-earnings-cache.json");
@@ -33,12 +29,12 @@ export async function MergeScrapedData() {
         // Continue with empty array - will still create stock entries with portfolio data
     }
 
-    // 4. Determine which stocks to process: use Yahoo results if available, otherwise fall back to portfolio stocks
+    // 3. Determine which stocks to process: use Yahoo results if available, otherwise fall back to portfolio stocks
     const stocksToProcess = yahoo_results.length > 0 
         ? yahoo_results.map(stock => ({ yahooData: stock, id: stock.id }))
         : portfolioStocks.map(stock => ({ yahooData: null, id: stock.id }));
 
-    // 5. For each stock, enrich with Google data and portfolio info, and save to per-stock cache.
+    // 4. For each stock, enrich with Google data and portfolio info, and save to per-stock cache.
     const finalResult = stocksToProcess.map(({ yahooData, id }) => {
         // Calculate expiry time 20 seconds from now in IST (expTime) for this cache entry.
         const after20Sec = new Date(new Date().getTime() + 20 * 1000);
@@ -86,6 +82,6 @@ export async function MergeScrapedData() {
         return stockData;
     });
 
-    // 6. Return the number of stocks processed (length of result array).
+    // 5. Return the number of stocks processed (length of result array).
     return finalResult?.length ?? 0;
 }

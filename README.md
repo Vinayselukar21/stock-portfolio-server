@@ -12,7 +12,7 @@ Stock Scraper is a Bun-powered data collection and serving layer designed to kee
 - **Merge pipeline** (`services/scraper-service.ts`)  
   - Reads the most recent Google scrape cache, combines it with fresh Yahoo results, enriches with portfolio attributes, and materializes one JSON document per stock under `services/localcache/stocks/`.
 - **Delivery layer** (`index.ts`)  
-  - Express server (running on Bun) exposes `/health`, `/stocks` (batched JSON), and `/stocks/stream` (Server-Sent Events) along with background schedulers that keep caches warm.
+  - Express server (running on Bun) exposes `/api/health`, `/api/stocks` (batched JSON), and `/api/stocks/stream` (Server-Sent Events) along with background schedulers that keep caches warm.
 - **Portfolio source of truth** (`portfolio/stocks.ts`)  
   - Declarative list of holdings with identifiers, sector, weighting, and acquisition data. Drives both scrapers.
 - **Local cache + observability** (`services/localcache/`)  
@@ -29,7 +29,7 @@ Stock Scraper is a Bun-powered data collection and serving layer designed to kee
    - Reads the cached Google metrics.
    - Enriches each stock with valuation metrics, investment metadata, and an expiry timestamp, then persists one file per stock under `services/localcache/stocks/<id>.json`.
    - Writes the number of stocks processed plus an IST timestamp to `services/localcache/logs.txt` and `lastSync.txt`.
-4. **API delivery** – Requests to `/stocks` aggregate every cached stock file into a single payload. `/stocks/stream` pushes the same aggregate every 20 seconds over SSE, ideal for dashboards that prefer push updates.
+4. **API delivery** – Requests to `/api/stocks` aggregate every cached stock file into a single payload. `/api/stocks/stream` pushes the same aggregate every 20 seconds over SSE, ideal for dashboards that prefer push updates.
 
 ---
 
@@ -37,7 +37,12 @@ Stock Scraper is a Bun-powered data collection and serving layer designed to kee
 
 ```
 .
-├── index.ts                     # Express app, schedulers, REST + SSE endpoints
+├── index.ts                     # Express app, schedulers, route mounting
+├── controllers/                 # Request handlers for API endpoints
+│   ├── stock.controller.ts      # Handler for /api/stocks endpoint
+│   └── stock.stream.controller.ts # Handler for /api/stocks/stream SSE endpoint
+├── routes/
+│   └── index.ts                 # Route definitions and endpoint mappings
 ├── portfolio/
 │   └── stocks.ts                # Portfolio configuration & symbols
 ├── scrapers/
@@ -47,8 +52,10 @@ Stock Scraper is a Bun-powered data collection and serving layer designed to kee
 │   ├── scraper-service.ts       # Merge pipeline and per-stock cache writer
 │   └── localcache/              # Generated JSON snapshots, logs, sync markers
 ├── types/                       # Shared TypeScript interfaces
-├── utils/                       # (Reserved for future helpers)
-└── portfolio/portfolioStocks    # Source for scraper symbol lists
+└── utils/                       # Utility functions and helpers
+    ├── envs.ts                  # Environment variable configuration
+    ├── log.ts                   # Logging utilities for sync timestamps
+    └── portfolio-symbol-list.ts # Symbol extraction from portfolio data
 ```
 
 Generated artifacts inside `services/localcache/` are intentionally committed here for inspection but can be git-ignored in downstream deployments if desired.
@@ -57,11 +64,11 @@ Generated artifacts inside `services/localcache/` are intentionally committed he
 
 ## API Surface
 
-| Endpoint          | Method | Description |
-|-------------------|--------|-------------|
-| `/health`         | GET    | Basic liveness probe (returns a string). |
-| `/stocks`         | GET    | Aggregates every cached `services/localcache/stocks/*.json` entry and returns `{ success, data, message }`. |
-| `/stocks/stream`  | GET    | Server-Sent Events feed that emits the aggregated stock array immediately and every 20s thereafter. |
+| Endpoint                | Method | Description |
+|------------------------|--------|-------------|
+| `/api/health`           | GET    | Basic liveness probe (returns a string). |
+| `/api/stocks`           | GET    | Aggregates every cached `services/localcache/stocks/*.json` entry and returns `{ success, data, message }`. |
+| `/api/stocks/stream`    | GET    | Server-Sent Events feed that emits the aggregated stock array immediately and every 20s thereafter. |
 
 All responses already include merged Google/Yahoo metrics plus investment metadata: purchase price, quantity, and portfolio percentage. Consumers do not need to join across files.
 
@@ -74,6 +81,8 @@ All responses already include merged Google/Yahoo metrics plus investment metada
 | `PORT` | `8080` | Express server port. |
 | `YAHOO_SCRAPE_INTERVAL` | `20000` seconds | Frequency for Yahoo fetch + merge cycle. |
 | `GOOGLE_SCRAPE_INTERVAL` | `20000` seconds | Frequency for Google scrape refresh. |
+| `ENVIRONMENT` | `development` | Set to `production` or `development` (affects CORS settings). |
+| `ALLOWED_ORIGINS` | *(optional)* | Comma-separated CORS origins for production (required when `ENVIRONMENT=production`). |
 | `YAHOO_HEADER_VARIANTS` | *(optional JSON array)* | Overrides default header rotation for Yahoo requests. |
 | `YAHOO_PROXY_LIST` | *(optional comma-separated URLs)* | Enables proxy rotation for Yahoo calls. |
 
@@ -105,8 +114,8 @@ Create a `.env` file in the project root (loaded via `dotenv`) to override defau
 
 5. **Monitor data**
    - Browse `services/localcache/stocks/` to inspect enriched per-stock JSON.
-   - Hit `http://localhost:8080/stocks` (or your configured port) for the aggregated API response.
-   - Consume `http://localhost:8080/stocks/stream` using an SSE-capable client for auto-refreshing dashboards.
+   - Hit `http://localhost:8080/api/stocks` (or your configured port) for the aggregated API response.
+   - Consume `http://localhost:8080/api/stocks/stream` using an SSE-capable client for auto-refreshing dashboards.
 
 ---
 
@@ -165,15 +174,16 @@ Create a `.env` file in the project root (loaded via `dotenv`) to override defau
 - **Caching & durability**: All scrape outputs live in `services/localcache/`, making failures recoverable between restarts and enabling offline inspection. Consider mounting a persistent volume when deploying to containers.
 - **Rate limiting**: Yahoo calls leverage rotating headers and optional proxy lists. Google scraping cycles through multiple user agents and introduces randomized backoff.
 - **Time zones**: All timestamps written to disk use `Asia/Kolkata` for quick readability in IST environments.
-- **Security**: The `/stocks` endpoint currently exposes the entire portfolio dataset to any caller with access to the server. Front the service with authentication if required.
+- **Security**: The `/api/stocks` endpoint currently exposes the entire portfolio dataset to any caller with access to the server. Front the service with authentication if required. CORS is configured based on the `ENVIRONMENT` variable (development allows all origins, production requires `ALLOWED_ORIGINS`).
 
 ---
 
 ## Tooling & Dependencies
 
 - Runtime: [Bun](https://bun.sh) with native TypeScript execution.
-- Web server: `express@5` with `cors` for local development.
-- HTTP clients: native `fetch` for Google scraping, `axios` + `yahoo-finance2` for Yahoo data with proxy/header rotation plumbing.
+- Web server: `express@5` with `cors` for CORS handling and environment-based origin configuration.
+- HTTP clients: native `fetch` for Google scraping, `yahoo-finance2` for Yahoo data with proxy/header rotation plumbing.
+- Architecture: MVC-style separation with controllers, routes, and services for maintainability.
 - Type definitions: colocated under `types/` to keep scraper outputs strongly typed.
 
 ---
