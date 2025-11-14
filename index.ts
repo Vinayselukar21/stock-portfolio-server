@@ -18,9 +18,21 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Enable CORS for frontend running at http://localhost:3000
+// Load allowed CORS origins from environment variable, fallback to defaults if not provided
+const ENVIRONMENT = process.env.ENVIRONMENT || "development";
+let allowedOrigins;
+
+if (ENVIRONMENT === "development") {
+    allowedOrigins = "*";
+} else if (process.env.ALLOWED_ORIGINS) {
+    allowedOrigins = process.env.ALLOWED_ORIGINS.split(",").map(url => url.trim());
+} else {
+    allowedOrigins = [];
+}
+console.log(allowedOrigins)
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: allowedOrigins,
     })
 );
 
