@@ -14,7 +14,13 @@ export async function MergeScrapedData() {
     }));
 
     // 2. Scrape latest data from Yahoo Finance for each symbol.
-    const yahoo_results = await ScrapeYahooFinance(yahoo_symbols);
+    let yahoo_results: YahooScrapeResponse[] = [];
+    try {
+        yahoo_results = await ScrapeYahooFinance(yahoo_symbols);
+    } catch (error) {
+        console.error(`[MergeScrapedData] Yahoo scraping failed:`, error instanceof Error ? error.message : error);
+        // Continue with empty array - Google data will still be merged
+    }
 
     // 3. Read the latest Google Finance scraped results from local cache. (P/E Ratio and Latest earnings)
     const filePath = resolve(process.cwd(), "services/localcache/google-peratio-earnings-cache.json");

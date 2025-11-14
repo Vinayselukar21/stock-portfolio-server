@@ -1,5 +1,5 @@
 import axios, { type AxiosRequestConfig } from "axios";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
 import YahooFinance from "yahoo-finance2";
 import type { YahooScrapeResponse } from "../types/yahoo-finance-type";
@@ -286,12 +286,35 @@ export async function ScrapeYahooFinance(yahoo_symbols: YahooScraperProps[]) {
   const currentTime = new Date().toLocaleTimeString("en-IN", {
     timeZone: "Asia/Kolkata"
   });
-  writeFileSync(yahooLastSyncOutputPath, `Yahoo sync at: ${currentTime}`, "utf8");
 
-  // Fetch quotes for all provided Yahoo symbols in parallel
-  const response = await Promise.all(
-    yahoo_symbols.map((s) => yahooFinance.quote(s.symbol))
-  );
+  // Fetch quotes for all provided Yahoo symbols in parallel with error handling
+  let response;
+  try {
+    response = await Promise.all(
+      yahoo_symbols.map((s) => yahooFinance.quote(s.symbol))
+    );
+    writeFileSync(yahooLastSyncOutputPath, `Yahoo sync at: ${currentTime}`, "utf8");
+  } catch (error) {
+    // Log error but don't crash - try to use cached data if available
+    console.error(`[Yahoo Finance Error] Failed to fetch data:`, error instanceof Error ? error.message : error);
+    writeFileSync(
+      yahooLastSyncOutputPath,
+      `Yahoo sync failed at: ${currentTime} - ${error instanceof Error ? error.message : "Unknown error"}`,
+      "utf8"
+    );
+    
+    // Try to read cached data if it exists
+    try {
+      const cachedData = readFileSync(outputPath, "utf8");
+      const parsed = JSON.parse(cachedData);
+      console.log(`[Yahoo Finance] Using cached data from previous run (${parsed.length} stocks)`);
+      return parsed;
+    } catch (cacheError) {
+      // No cache available, return empty array
+      console.warn(`[Yahoo Finance] No cached data available. Returning empty results.`);
+      return [];
+    }
+  }
 
   // Structure and normalize the response data
   const results: YahooScrapeResponse[] =

@@ -75,22 +75,41 @@ export const google_symbols = portfolioStocks?.flatMap(stock => {
     return { symbol: stock.symbol.google, id: stock.id };
 });
 // Run an initial Google Finance scrape on server startup
-await ScrapeGoogleFinance(google_symbols);
-// Merge data from Google and Yahoo, and cache enriched results on disk
-const length = await MergeScrapedData();
+try {
+    await ScrapeGoogleFinance(google_symbols);
+} catch (error) {
+    console.error(`[Startup] Google Finance scraping failed:`, error instanceof Error ? error.message : error);
+}
 
-// Log number of stocks processed in initial run
-Log(length);
+// Merge data from Google and Yahoo, and cache enriched results on disk
+let length = 0;
+try {
+    length = await MergeScrapedData();
+    // Log number of stocks processed in initial run
+    Log(length);
+} catch (error) {
+    console.error(`[Startup] MergeScrapedData failed:`, error instanceof Error ? error.message : error);
+    // Log with 0 length to indicate no stocks were processed
+    Log(0);
+}
 // Periodically fetch latest Google Finance data using a set interval (in seconds)
 setInterval(async () => {
-    await ScrapeGoogleFinance(google_symbols);
-
+    try {
+        await ScrapeGoogleFinance(google_symbols);
+    } catch (error) {
+        console.error(`[Periodic] Google Finance scraping failed:`, error instanceof Error ? error.message : error);
+    }
 }, GOOGLE_SCRAPE_INTERVAL * 1000);
 
 // Periodically re-merge and log Yahoo Finance data at configured interval (in seconds)
 setInterval(async () => {
-    const length = await MergeScrapedData();
-    Log(length);
+    try {
+        const length = await MergeScrapedData();
+        Log(length);
+    } catch (error) {
+        console.error(`[Periodic] MergeScrapedData failed:`, error instanceof Error ? error.message : error);
+        Log(0);
+    }
 }, YAHOO_SCRAPE_INTERVAL * 1000);
 
 // Health check route to verify server is running
