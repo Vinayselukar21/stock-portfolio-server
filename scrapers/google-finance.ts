@@ -1,27 +1,12 @@
-// Import required Node.js path modules to handle filesystem paths and URLs
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-// Import the type definition for the Google Finance scraper result structure
-import type { GoogleFinanceResult } from "../types/google-finance-type";
-// Import functions for creating directories and writing files
 import { mkdirSync, writeFileSync } from "fs";
+import { dirname, resolve } from "path";
+import type { GoogleFinanceResult } from "../types/google-finance-type";
 
-// Get the current file's name and its directory name for relative path operations
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Interface defining structure for input stock symbol and associated id
 interface GoogleScraperProps {
   symbol: string;
   id: string;
 }
 
-/**
- * Extracts financial information (P/E ratio and Earnings per share) from the HTML content 
- * of a Google Finance stock page.
- * @param htmlContent - Raw HTML content of the page
- * @returns Object with extracted (raw) P/E ratio and earnings per share values
- */
 function extractFinancials(htmlContent: string) {
   // Extract P/E ratio using a regex that matches its location on the page
   const peRatioMatch = htmlContent.match(
@@ -39,11 +24,6 @@ function extractFinancials(htmlContent: string) {
   return { peRatio, earningsPerShare };
 }
 
-/**
- * Fetches the HTML of a Google Finance stock page and extracts financial data.
- * @param props - Input object with stock symbol and id
- * @returns Parsed GoogleFinanceResult object containing P/E and EPS data
- */
 async function main(props: GoogleScraperProps) {
   // Form URL to fetch, override via command-line argument if present
   const targetUrl = process.argv[2] ?? `https://www.google.com/finance/quote/${props.symbol}`;
@@ -103,13 +83,6 @@ async function main(props: GoogleScraperProps) {
   return result;
 }
 
-/**
- * Main function to scrape Google Finance for all input stock symbols, 
- * save the results locally (cache), and return parsed results.
- * 
- * @param google_symbols - Array of input objects ({symbol, id}) for scraping
- * @returns Array of valid GoogleFinanceResult objects (failed ones are dropped)
- */
 export async function ScrapeGoogleFinance(google_symbols: GoogleScraperProps[]) {
 
   // Resolve path where scraped Google Finance data will be cached to disk (JSON file)
