@@ -78,6 +78,7 @@ let yahooInterval: NodeJS.Timeout | null = null;
 
 // Controller that starts/stops jobs as per India stock market time
 function scheduleMarketJobController() {
+    console.log("🚀 Scheduling Jobs... 📈")
     // Check every minute whether to start/stop the jobs
     setInterval(marketJobControlLoop, 15 * 60 * 1000);
     // Run on startup
@@ -86,11 +87,13 @@ function scheduleMarketJobController() {
 
 async function marketJobControlLoop() {
     if (isMarketOpenNow()) {
+        console.log("Market Open - Scrapers Active... ✅")
         if (!googleInterval && !yahooInterval) {
             console.log("[Market] Market open! Starting background jobs...");
             await startBackgroundJobs();
         }
     } else {
+        console.log("Market Closed - Scrapers Inactive... ❌")
         // Market is closed, stop if they are running
         if (googleInterval || yahooInterval) {
             console.log("[Market] Market closed! Stopping background jobs...");
