@@ -38,6 +38,23 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+// keep alive api
+const API_URL = "https://api-caller-render.onrender.com/api/health";
+
+setInterval(async () => {
+    try {
+        const res = await fetch(API_URL);
+        if (!res.ok) {
+            console.log("Keep alive GET API call failed: " + res.statusText);
+        } else {
+            console.log("Keep alive GET API call successful");
+        }
+    } catch (err) {
+        console.log("Keep alive GET API call error: " + err);
+    }
+}, 10 * 60 * 1000); // runs every 10 minutes
+
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     scheduleMarketJobController(); // 👈 Start the market job controller AFTER server is live
