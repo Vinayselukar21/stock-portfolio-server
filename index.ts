@@ -12,9 +12,9 @@ import { google_symbols } from "./utils/portfolio-symbol-list";
 
 // Helper for India market hours (NSE/BSE)
 const MARKET_OPEN_HOUR = 9;
-const MARKET_OPEN_MIN = 15;
+const MARKET_OPEN_MIN = 1;
 const MARKET_CLOSE_HOUR = 15;
-const MARKET_CLOSE_MIN = 30;
+const MARKET_CLOSE_MIN = 45;
 const MARKET_DAYS = [1, 2, 3, 4, 5]; // Monday-Friday
 
 const app = express();
@@ -61,25 +61,24 @@ app.listen(PORT, () => {
 });
 
 // --- Helpers for market timings ---
+
+// Returns the current time in Asia/Kolkata timezone as a Date object
 function getIndiaTime() {
-    // India Standard Time = UTC+5:30
-    const nowUTC = new Date();
-    // convert to millis in IST
-    const utcOffset = nowUTC.getTime() + (330 * 60 * 1000); // 330 min = 5h30m
-    const istNow = new Date(utcOffset);
-    return istNow;
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 }
 
+// Returns true if current time in Asia/Kolkata is during market open hours (Mon-Fri, 9:15 to 15:30)
 function isMarketOpenNow() {
     const now = getIndiaTime();
-    const day = now.getUTCDay(); // Sunday=0, Monday=1, ..., Saturday=6 (but IST date)
-    if (!MARKET_DAYS.includes(day)) {
-        return false;
-    }
-    const hour = now.getUTCHours();
-    const minute = now.getUTCMinutes();
+    const day = now.getDay(); // Sunday=0, Monday=1, ..., Saturday=6
 
-    // Market opens at 9:15, closes at 15:30 IST.
+    // Market days: Monday(1) to Friday(5)
+    if (day < 1 || day > 5) return false;
+
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+
+    // Market open: 9:15 to 15:30 IST
     if (
         (hour > MARKET_OPEN_HOUR && hour < MARKET_CLOSE_HOUR) ||
         (hour === MARKET_OPEN_HOUR && minute >= MARKET_OPEN_MIN) ||
